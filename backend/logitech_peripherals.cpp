@@ -1,7 +1,10 @@
 #include "hidpp20_device.h"
 #include "logitech_peripherals.h"
+#include "config.h"
+#include <map>
 
 namespace Logitech {
+    static std::map<std::string, std::string> g_device_names;
 
     void init() {
         HidppDriver::init();
@@ -28,17 +31,39 @@ namespace Logitech {
                 dev.path = d.path;
                 std::string product(d.product.begin(), d.product.end());
                 dev.name = product.empty() ? "Logitech Device" : product;
+                g_device_names[dev.path] = dev.name; 
                 
                 Hidpp20Device hdev(d.path, dev.name);
                 if (hdev.connect()) {
-                    int dpi = hdev.get_dpi();
-                    if (dpi > 0) dev.current_dpi = dpi;
-                    else dev.current_dpi = 800; 
+                    int cfg_dpi = LogitechConfig::get_int(LgConfigCategory::Mouse, dev.name, "DPI", -1);
+                    if (cfg_dpi != -1) {
+                         hdev.set_dpi(cfg_dpi);
+                         dev.current_dpi = cfg_dpi;
+                    } else {
+                         int dpi = hdev.get_dpi();
+                         if (dpi > 0) dev.current_dpi = dpi;
+                         else dev.current_dpi = 800; 
+                    }
+
+                    int cfg_rate = LogitechConfig::get_int(LgConfigCategory::Mouse, dev.name, "PollingRate", -1);
+                    if (cfg_rate != -1) {
+                        hdev.set_polling_rate(cfg_rate);
+                        dev.current_rate_ms = cfg_rate;
+                    } else {
+                        int rate = hdev.get_polling_rate();
+                        if (rate > 0) dev.current_rate_ms = rate; 
+                        else dev.current_rate_ms = 1; 
+                    }
                     
-                    int rate = hdev.get_polling_rate();
-                    if (rate > 0) dev.current_rate_ms = rate; 
-                    else dev.current_rate_ms = 1; 
-                    
+                    int cfg_rgb_mode = LogitechConfig::get_int(LgConfigCategory::RGB, dev.name, "Mode", -1);
+                    if (cfg_rgb_mode != -1) {
+                         int r = LogitechConfig::get_int(LgConfigCategory::RGB, dev.name, "ColorR", 0);
+                         int g = LogitechConfig::get_int(LgConfigCategory::RGB, dev.name, "ColorG", 255);
+                         int b = LogitechConfig::get_int(LgConfigCategory::RGB, dev.name, "ColorB", 255);
+                         int speed = LogitechConfig::get_int(LgConfigCategory::RGB, dev.name, "Speed", 5000);
+                         hdev.set_led(cfg_rgb_mode, r, g, b, speed);
+                    }
+
                     int max_dpi = hdev.get_max_dpi();
                     if (max_dpi > 0) dev.max_dpi = max_dpi;
                     else dev.max_dpi = 25600;
@@ -60,13 +85,25 @@ namespace Logitech {
     bool set_dpi(const std::string& path, int dpi) {
         Hidpp20Device dev(path, "");
         if (!dev.connect()) return false;
-        return dev.set_dpi(dpi);
+        if (dev.set_dpi(dpi)) {
+            if (g_device_names.count(path)) {
+                LogitechConfig::set_int(LgConfigCategory::Mouse, g_device_names[path], "DPI", dpi);
+            }
+            return true;
+        }
+        return false;
     }
 
     bool set_polling_rate(const std::string& path, int rate_ms) {
         Hidpp20Device dev(path, "");
         if (!dev.connect()) return false;
-        return dev.set_polling_rate(rate_ms);
+        if (dev.set_polling_rate(rate_ms)) {
+             if (g_device_names.count(path)) {
+                LogitechConfig::set_int(LgConfigCategory::Mouse, g_device_names[path], "PollingRate", rate_ms);
+            }
+            return true;
+        }
+        return false;
     }
 
     bool set_rgb(const std::string& path, int r, int g, int b) {
@@ -78,6 +115,16 @@ namespace Logitech {
     bool set_led(const std::string& path, int mode, int r, int g, int b, int period) {
         Hidpp20Device dev(path, "");
         if (!dev.connect()) return false;
-        return dev.set_led(mode, r, g, b, period);
+        if (dev.set_led(mode, r, g, b, period)) {
+             if (g_device_names.count(path)) {
+                LogitechConfig::set_int(LgConfigCategory::RGB, g_device_names[path], "Mode", mode);
+                LogitechConfig::set_int(LgConfigCategory::RGB, g_device_names[path], "ColorR", r);
+                LogitechConfig::set_int(LgConfigCategory::RGB, g_device_names[path], "ColorG", g);
+                LogitechConfig::set_int(LgConfigCategory::RGB, g_device_names[path], "ColorB", b);
+                LogitechConfig::set_int(LgConfigCategory::RGB, g_device_names[path], "Speed", period);
+            }
+            return true;
+        }
+        return false;
     }
 }

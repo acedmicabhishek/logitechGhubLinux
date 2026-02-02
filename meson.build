@@ -15,7 +15,8 @@ shared_library('logitech_ghub',
     'logitech_plugin.cpp',
     'backend/logitech_peripherals.cpp',
     'backend/hidpp_driver.cpp',
-    'backend/hidpp20_device.cpp'
+    'backend/hidpp20_device.cpp',
+    'backend/config.cpp'
   ],
   dependencies: [gtk_dep, libadwaita_dep, hidapi_dep],
   include_directories: inc,
