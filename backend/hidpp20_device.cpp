@@ -1,6 +1,16 @@
 #include "hidpp20_device.h"
 #include "hidpp_constants.h"
+#include <cstdint>
 #include <iostream>
+
+namespace {
+bool is_error_response(const std::vector<unsigned char>& resp) {
+    return resp.size() >= 3 && (resp[2] == 0xFF || resp[2] == 0x8F);
+}
+bool is_ack_for(const std::vector<unsigned char>& resp, uint8_t feat_idx) {
+    return resp.size() >= 3 && !is_error_response(resp) && resp[2] == feat_idx;
+}
+}
 
 Hidpp20Device::Hidpp20Device(const std::string& path, const std::string& name) 
     : m_path(path), m_name(name) {}
@@ -198,9 +208,9 @@ bool Hidpp20Device::set_dpi(int dpi) {
     cmd[4] = 0x00; // Sensor 0
     cmd[5] = (dpi >> 8) & 0xFF;
     cmd[6] = (dpi & 0xFF);
-    
+
     auto resp = m_driver.send_recv(cmd);
-    return !resp.empty();
+    return is_ack_for(resp, feat_idx);
 }
 
 bool Hidpp20Device::set_polling_rate(int ms) {
@@ -219,9 +229,9 @@ bool Hidpp20Device::set_polling_rate(int ms) {
     cmd[2] = feat_idx;
     cmd[3] = CMD_ADJUSTABLE_REPORT_RATE_SET_REPORT_RATE; // 0x20
     cmd[4] = (uint8_t)ms;
-    
+
     auto resp = m_driver.send_recv(cmd);
-    return !resp.empty();
+    return is_ack_for(resp, feat_idx);
 }
 
 bool Hidpp20Device::set_led(int mode, int r, int g, int b, int period) {
@@ -292,11 +302,11 @@ bool Hidpp20Device::set_led(int mode, int r, int g, int b, int period) {
     for (int zone = 0; zone <= max_zone; zone++) {
         cmd[4] = (uint8_t)zone;
         auto resp = m_driver.send_recv(cmd);
-        if (!resp.empty()) {
+        if (is_ack_for(resp, feat_idx)) {
              std::cout << "[Hidpp20] Zone " << zone << " Success! Resp size: " << resp.size() << std::endl;
              overall_success = true;
         } else {
-             std::cout << "[Hidpp20] Zone " << zone << " Failed/NoResp." << std::endl;
+             std::cout << "[Hidpp20] Zone " << zone << " Failed/NoResp/Error." << std::endl;
         }
     }
     

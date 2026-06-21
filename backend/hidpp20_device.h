@@ -1,5 +1,6 @@
 #pragma once
 #include "hidpp_driver.h"
+#include <cstdint>
 #include <map>
 #include <string>
 #include <memory>

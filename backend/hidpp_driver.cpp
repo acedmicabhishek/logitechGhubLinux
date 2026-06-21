@@ -77,7 +77,11 @@ std::vector<unsigned char> HidppDriver::send_recv(const std::vector<unsigned cha
 
     unsigned char buf[65];
     std::memset(buf, 0, sizeof(buf));
-    res = hid_read(m_handle, buf, sizeof(buf));
+    res = hid_read_timeout(m_handle, buf, sizeof(buf), 1000);
+    if (res == 0) {
+        std::wcerr << L"[HidppDriver] Read timed out (no response)" << std::endl;
+        return {};
+    }
     if (res < 0) {
         std::wcerr << L"[HidppDriver] Read failed: " << (const wchar_t*)hid_error(m_handle) << std::endl;
         return {};
